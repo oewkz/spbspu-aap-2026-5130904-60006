@@ -1,112 +1,127 @@
+#include <cstddef>
 #include <iostream>
 #include <limits>
-#include <cstddef>
+#include <stdexcept>
 
-namespace zakirov
-{
+namespace zakirov {
   const int input_error = 1;
   const int calculation_error = 2;
+
+  class CountMin {
+  public:
+    CountMin():
+      smallest_(0),
+      count_(0),
+      overflow_(false)
+    {}
+
+    void operator()(int number)
+    {
+      if (count_ == 0 || number < smallest_) {
+        smallest_ = number;
+        count_ = 1;
+        overflow_ = false;
+      } else if (number == smallest_) {
+        if (count_ == std::numeric_limits< std::size_t >::max()) {
+          overflow_ = true;
+        } else {
+          ++count_;
+        }
+      }
+    }
+
+    std::size_t operator()() const
+    {
+      if (overflow_) {
+        throw std::overflow_error("16: переполнение");
+      }
+      return count_;
+    }
+
+  private:
+    int smallest_;
+    std::size_t count_;
+    bool overflow_;
+  };
+
+  class CountDiv {
+  public:
+    CountDiv():
+      last_(0),
+      count_(0),
+      first_(true),
+      enough_(false),
+      overflow_(false)
+    {}
+
+    void operator()(int number)
+    {
+      if (first_) {
+        first_ = false;
+      } else {
+        enough_ = true;
+        if (last_ == -1 || number % last_ == 0) {
+          if (count_ == std::numeric_limits< std::size_t >::max()) {
+            overflow_ = true;
+          } else {
+            ++count_;
+          }
+        }
+      }
+      last_ = number;
+    }
+
+    std::size_t operator()() const
+    {
+      if (!enough_) {
+        throw std::logic_error("11: мало чисел");
+      }
+      if (overflow_) {
+        throw std::overflow_error("11: переполнение");
+      }
+      return count_;
+    }
+
+  private:
+    int last_;
+    std::size_t count_;
+    bool first_;
+    bool enough_;
+    bool overflow_;
+  };
+
+  int process(std::istream &in, std::ostream &out, std::ostream &err)
+  {
+    CountMin minimum;
+    CountDiv divs;
+    int number = 0;
+    while (in >> number && number != 0) {
+      minimum(number);
+      divs(number);
+    }
+    if (!in) {
+      err << "Ошибка ввода\n";
+      return input_error;
+    }
+
+    int result = 0;
+    try {
+      out << minimum() << '\n';
+    } catch (const std::exception &error) {
+      err << error.what() << '\n';
+      result = calculation_error;
+    }
+    try {
+      out << divs() << '\n';
+    } catch (const std::exception &error) {
+      err << error.what() << '\n';
+      result = calculation_error;
+    }
+    return result;
+  }
 }
 
 int main()
 {
-  int number = 0;
-  int last = 0;
-  int smallest = 0;
-
-  std::size_t minimums = 0;
-  std::size_t divs = 0;
-
-  bool first = true;
-  bool enough_numbers = false;
-  bool minimum_error = false;
-  bool div_error = false;
-
-  const std::size_t limit = std::numeric_limits< std::size_t >::max();
-
-  while (std::cin >> number)
-  {
-    if (number == 0)
-    {
-      break;
-    }
-
-    if (first)
-    {
-      smallest = number;
-      minimums = 1;
-      last = number;
-      first = false;
-      continue;
-    }
-
-    enough_numbers = true;
-
-    if (number < smallest)
-    {
-      smallest = number;
-      minimums = 1;
-      minimum_error = false;
-    }
-    else if (number == smallest)
-    {
-      if (minimums < limit)
-      {
-        minimums++;
-      }
-      else
-      {
-        minimum_error = true;
-      }
-    }
-
-    if (last == -1 || number % last == 0)
-    {
-      if (divs < limit)
-      {
-        divs++;
-      }
-      else
-      {
-        div_error = true;
-      }
-    }
-
-    last = number;
-  }
-
-  if (!std::cin)
-  {
-    std::cerr << "Ошибка ввода\n";
-    return zakirov::input_error;
-  }
-
-  if (!minimum_error)
-  {
-    std::cout << minimums << '\n';
-  }
-  else
-  {
-    std::cerr << "16: переполнение\n";
-  }
-
-  if (!enough_numbers)
-  {
-    std::cerr << "11: мало чисел\n";
-  }
-  else if (div_error)
-  {
-    std::cerr << "11: переполнение\n";
-  }
-  else
-  {
-    std::cout << divs << '\n';
-  }
-
-  if (minimum_error || div_error || !enough_numbers)
-  {
-    return zakirov::calculation_error;
-  }
-
-  return 0;
+  return zakirov::process(std::cin, std::cout, std::cerr);
 }
